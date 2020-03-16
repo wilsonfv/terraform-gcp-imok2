@@ -4,9 +4,9 @@ This is based on [terraform-google-module](https://registry.terraform.io/modules
 with a custom validation implementation to validate terraform input variables. <br/>
 
 ## Table of contents
-[Terraform official validation functionality VS Custom valiation implementation](#Terraform official validation functionality VS Custom valiation implementation)<br>
-[Custom validation implementation Details](#Custom validation implementation Details)<br>
-[Development](#Development)<br>
+[Terraform official validation functionality VS Custom valiation implementation](#terraform-official-validation-functionality-vs-custom-valiation-implementation)<br>
+[Custom validation implementation Details](#custom-validation-implementation-details)<br>
+[Development](#development)<br>
 
 ## Terraform official validation functionality VS Custom valiation implementation
 
