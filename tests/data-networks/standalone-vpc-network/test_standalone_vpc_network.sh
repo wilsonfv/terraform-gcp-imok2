@@ -9,4 +9,4 @@ echo "working directory ${SCRIPT_PATH}"
 terraform init
 terraform plan -var="service_project_id=${SERVICE_PROJECT_ID}"
 terraform apply -auto-approve -var="service_project_id=${SERVICE_PROJECT_ID}"
-terraform destroy -auto-approve -var="service_project_id=${SERVICE_PROJECT_ID}"
+#terraform destroy -auto-approve -var="service_project_id=${SERVICE_PROJECT_ID}"

@@ -15,10 +15,14 @@ locals {
 }
 
 module "create_service_project_standalone_vpc_network" {
-  source                 = "../../../data-networks/standalone-vpc-network"
-  service_project_id     = var.service_project_id
-  network_continent      = local.network_continent
-  network_name           = local.network_name
+  source                                  = "../../../data-networks/standalone-vpc-network"
+  service_project_id                      = var.service_project_id
+  network_continent                       = local.network_continent
+  network_name                            = local.network_name
+  enable_fw_cloud_dns_ingress             = true
+  enable_fw_lb_health_check_egress        = true
+  enable_fw_lb_health_check_ingress       = true
+  enable_fw_restricted_google_apis_egress = true
 
   subnets = [
     {
@@ -56,6 +60,27 @@ module "create_service_project_standalone_vpc_network" {
         ip_cidr_range = "192.168.216.0/21"
       },
     ]
+  }
+
+  custom_firewall_rules = {
+    allow-gke-master-egress = {
+      description          = "firewall rule to allow traffic to gke master ip range"
+      direction            = "EGRESS"
+      action               = "allow"
+      ranges               = ["172.16.0.0/28"]
+      sources              = []
+      targets              = []
+      use_service_accounts = false
+      rules = [
+        {
+          protocol = "tcp"
+          ports    = ["443", "10250"]
+        }
+      ]
+      extra_attributes = {
+        enable_logging = true
+      }
+    }
   }
 }
 

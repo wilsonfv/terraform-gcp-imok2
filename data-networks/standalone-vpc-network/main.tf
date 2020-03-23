@@ -35,106 +35,135 @@ module standalone-subnet {
 /******************************************
     firewall rule
  *****************************************/
-resource "google_compute_firewall" "default-deny-egress" {
-  name               = "fw-${module.standalone-vpc-network.network_name}-default-deny-egress"
-  network            = module.standalone-vpc-network.network_self_link
-  project            = var.service_project_id
-  priority           = "65535"
-  direction          = "EGRESS"
-  destination_ranges = ["0.0.0.0/0"]
-  deny {
-    protocol = "all"
-  }
+module "custom-firewall-rule" {
+  source              = "git::git@github.com:terraform-google-modules/terraform-google-network.git//modules/fabric-net-firewall?ref=master"
+  network             = module.standalone-vpc-network.network_self_link
+  project_id          = var.service_project_id
+  ssh_source_ranges   = []
+  http_source_ranges  = []
+  https_source_ranges = []
+  custom_rules = merge(
+    {
+      default-deny-egress = {
+        description          = "default deny all egress"
+        direction            = "EGRESS"
+        action               = "deny"
+        ranges               = ["0.0.0.0/0"]
+        sources              = []
+        targets              = []
+        use_service_accounts = false
+        rules = [
+          {
+            protocol = "tcp"
+            ports    = ["0-65535"]
+          },
+          {
+            protocol = "udp"
+            ports    = ["0-65535"]
+          }
+        ]
+        extra_attributes = {
+          enable_logging = true
+          priority       = "65535"
+        }
+      }
+    }
+    ,
+    var.enable_fw_restricted_google_apis_egress == true ?
+    {
+      fw-restricted-google-apis-egress = {
+        description          = "allow traffic to restricted google apis"
+        direction            = "EGRESS"
+        action               = "allow"
+        ranges               = ["199.36.153.4/30"]
+        sources              = []
+        targets              = []
+        use_service_accounts = false
+        rules = [
+          {
+            protocol = "tcp"
+            ports    = ["443"]
+          }
+        ]
+        extra_attributes = {
+          enable_logging = true
+        }
+      }
+    } : {}
+    ,
+    var.enable_fw_lb_health_check_ingress == true ?
+    {
+      fw-lb-health-check-ingress = {
+        description          = "allow ingress traffic for health check"
+        direction            = "INGRESS"
+        action               = "allow"
+        ranges               = ["130.211.0.0/22", "35.191.0.0/16"]
+        sources              = []
+        targets              = []
+        use_service_accounts = false
+        rules = [
+          {
+            protocol = "tcp"
+            ports    = ["80", "443"]
+          }
+        ]
+        extra_attributes = {
+          enable_logging = true
+        }
+      }
+    } : {}
+    ,
+    var.enable_fw_lb_health_check_egress == true ?
+    {
+      fw-lb-health-check-egress = {
+        description          = "allow egress traffic for health check"
+        direction            = "EGRESS"
+        action               = "allow"
+        ranges               = ["130.211.0.0/22", "35.191.0.0/16"]
+        sources              = []
+        targets              = []
+        use_service_accounts = false
+        rules = [
+          {
+            protocol = "tcp"
+            ports    = ["80", "443"]
+          }
+        ]
+        extra_attributes = {
+          enable_logging = true
+        }
+      }
+    } : {}
+    ,
+    var.enable_fw_cloud_dns_ingress == true ?
+    {
+      fw-cloud-dns-ingress = {
+        description          = "allow ingress traffic for cloud dns"
+        direction            = "INGRESS"
+        action               = "allow"
+        ranges               = ["35.199.192.0/19"]
+        sources              = []
+        targets              = ["t-${module.standalone-vpc-network.network_name}-cloud-dns-ingress"]
+        use_service_accounts = false
+        rules = [
+          {
+            protocol = "tcp"
+            ports    = ["53"]
+          },
+          {
+            protocol = "udp"
+            ports    = ["53"]
+          }
+        ]
+        extra_attributes = {
+          enable_logging = true
+        }
+      }
+    } : {}
+    ,
+    var.custom_firewall_rules
+  )
 }
-//
-//resource "google_compute_firewall" "fw-internal-ingress" {
-//  for_each      = var.enable_fw_internal_ingress ? local.subnets : {}
-//  name          = "fw-${each.value.subnet_name}-internal-ingress"
-//  network       = google_compute_network.network.self_link
-//  project       = var.service_project_id
-//  direction     = "INGRESS"
-//  source_ranges = [each.value.subnet_ip]
-//  allow {
-//    protocol = "tcp"
-//  }
-//  allow {
-//    protocol = "udp"
-//  }
-//}
-//
-//resource "google_compute_firewall" "fw-internal-egress" {
-//  for_each           = var.enable_fw_internal_egress ? local.subnets : {}
-//  name               = "fw-${each.value.subnet_name}-internal-egress"
-//  network            = google_compute_network.network.self_link
-//  project            = var.service_project_id
-//  direction          = "EGRESS"
-//  destination_ranges = [each.value.subnet_ip]
-//  allow {
-//    protocol = "tcp"
-//  }
-//  allow {
-//    protocol = "udp"
-//  }
-//}
-//
-resource "google_compute_firewall" "fw-restricted-google-apis-egress" {
-  count              = var.enable_fw_restricted_google_apis_egress ? 1 : 0
-  name               = "fw-${module.standalone-vpc-network.network_name}-restricted-google-apis-egress"
-  network            = module.standalone-vpc-network.network_self_link
-  project            = var.service_project_id
-  direction          = "EGRESS"
-  destination_ranges = ["199.36.153.4/30"]
-  allow {
-    protocol = "tcp"
-    ports    = ["443"]
-  }
-}
-//
-//resource "google_compute_firewall" "fw-lb-health-check-ingress" {
-//  count         = var.enable_fw_lb_health_check_ingress ? 1 : 0
-//  name          = "fw-${var.network_name}-lb-health-check-ingress"
-//  network       = google_compute_network.network.self_link
-//  project       = var.service_project_id
-//  direction     = "INGRESS"
-//  source_ranges = ["130.211.0.0/22", "35.191.0.0/16"]
-//  allow {
-//    protocol = "tcp"
-//    ports    = ["80", "443"]
-//  }
-//  target_tags = ["t-${var.network_name}-lb-health-check-ingress"]
-//}
-//
-//resource "google_compute_firewall" "fw-lb-health-check-egress" {
-//  count              = var.enable_fw_lb_health_check_egress ? 1 : 0
-//  name               = "fw-${var.network_name}-lb-health-check-egress"
-//  network            = google_compute_network.network.self_link
-//  project            = var.service_project_id
-//  direction          = "EGRESS"
-//  destination_ranges = ["130.211.0.0/22", "35.191.0.0/16"]
-//  allow {
-//    protocol = "tcp"
-//    ports    = ["80", "443"]
-//  }
-//  target_tags = ["t-${var.network_name}-lb-health-check-egress"]
-//}
-//
-//resource "google_compute_firewall" "fw-cloud-dns-ingress" {
-//  count         = var.enable_fw_cloud_dns_ingress ? 1 : 0
-//  name          = "fw-${var.network_name}-cloud-dns-ingress"
-//  network       = google_compute_network.network.self_link
-//  project       = var.service_project_id
-//  direction     = "INGRESS"
-//  source_ranges = ["35.199.192.0/19"]
-//  allow {
-//    protocol = "tcp"
-//    ports    = ["53"]
-//  }
-//  allow {
-//    protocol = "udp"
-//    ports    = ["53"]
-//  }
-//  target_tags = ["t-${var.network_name}-cloud-dns-ingress"]
-//}
 
 /******************************************
 	route
@@ -152,4 +181,81 @@ module "default_routes" {
       next_hop_internet = "true"
     }
   ]
+}
+
+/******************************************
+	Cloud DNS Private Zone
+ *****************************************/
+resource "google_dns_managed_zone" "google-apis" {
+  name        = "google-apis"
+  project     = var.service_project_id
+  dns_name    = "googleapis.com."
+  description = "private zone for Google API's"
+
+  visibility = "private"
+
+  private_visibility_config {
+    networks {
+      network_url = module.standalone-vpc-network.network_self_link
+    }
+  }
+}
+
+resource "google_dns_record_set" "restricted-google-apis-A-record" {
+  name    = "restricted.googleapis.com."
+  project = var.service_project_id
+  type    = "A"
+  ttl     = 300
+
+  managed_zone = google_dns_managed_zone.google-apis.name
+
+  rrdatas = ["199.36.153.4", "199.36.153.5", "199.36.153.6", "199.36.153.7"]
+}
+
+resource "google_dns_record_set" "google-api-CNAME" {
+  name    = "*.googleapis.com."
+  project = var.service_project_id
+  type    = "CNAME"
+  ttl     = 300
+
+  managed_zone = google_dns_managed_zone.google-apis.name
+
+  rrdatas = ["restricted.googleapis.com."]
+}
+
+resource "google_dns_managed_zone" "gcr-io" {
+  name        = "gcr-io"
+  project     = var.service_project_id
+  dns_name    = "gcr.io."
+  description = "private zone for GCR.io"
+
+  visibility = "private"
+
+  private_visibility_config {
+    networks {
+      network_url = module.standalone-vpc-network.network_self_link
+    }
+  }
+}
+
+resource "google_dns_record_set" "restricted-gcr-io-A-record" {
+  name    = "gcr.io."
+  project = var.service_project_id
+  type    = "A"
+  ttl     = 300
+
+  managed_zone = google_dns_managed_zone.gcr-io.name
+
+  rrdatas = ["199.36.153.4", "199.36.153.5", "199.36.153.6", "199.36.153.7"]
+}
+
+resource "google_dns_record_set" "gcr-io-CNAME" {
+  name    = "*.gcr.io."
+  project = var.service_project_id
+  type    = "CNAME"
+  ttl     = 300
+
+  managed_zone = google_dns_managed_zone.gcr-io.name
+
+  rrdatas = ["gcr.io."]
 }
