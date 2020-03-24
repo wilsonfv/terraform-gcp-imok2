@@ -33,3 +33,4 @@ override.tf.json
 .idea
 .git
 *.tfdebug.txt
+*.imok2.auto.tfvars.json
