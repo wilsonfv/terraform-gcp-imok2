@@ -8,26 +8,28 @@ data "external" "validation" {
     network_continent = jsonencode(var.network_continent)
     subnets           = jsonencode(var.subnets)
     secondary_ranges  = jsonencode(var.secondary_ranges)
+    shared_vpc_host   = jsonencode(var.shared_vpc_host)
   }
 }
 
 /******************************************
 	VPC configuration
  *****************************************/
-module "standalone-vpc-network" {
-  source       = "git::git@github.com:terraform-google-modules/terraform-google-network.git//modules/vpc?ref=master"
-  project_id   = var.service_project_id
-  network_name = var.network_name
-  description  = var.description
+module "vpc-network" {
+  source          = "git::git@github.com:terraform-google-modules/terraform-google-network.git//modules/vpc?ref=master"
+  project_id      = var.project_id
+  network_name    = var.network_name
+  shared_vpc_host = var.shared_vpc_host
+  description     = var.description
 }
 
 /******************************************
 	Subnet configuration
  *****************************************/
-module standalone-subnet {
+module subnet {
   source           = "git::git@github.com:terraform-google-modules/terraform-google-network.git//modules/subnets?ref=master"
-  project_id       = var.service_project_id
-  network_name     = module.standalone-vpc-network.network_name
+  project_id       = var.project_id
+  network_name     = module.vpc-network.network_name
   subnets          = var.subnets
   secondary_ranges = var.secondary_ranges
 }
@@ -37,8 +39,8 @@ module standalone-subnet {
  *****************************************/
 module "custom-firewall-rule" {
   source              = "git::git@github.com:terraform-google-modules/terraform-google-network.git//modules/fabric-net-firewall?ref=master"
-  network             = module.standalone-vpc-network.network_self_link
-  project_id          = var.service_project_id
+  network             = module.vpc-network.network_self_link
+  project_id          = var.project_id
   ssh_source_ranges   = []
   http_source_ranges  = []
   https_source_ranges = []
@@ -143,7 +145,7 @@ module "custom-firewall-rule" {
         action               = "allow"
         ranges               = ["35.199.192.0/19"]
         sources              = []
-        targets              = ["t-${module.standalone-vpc-network.network_name}-cloud-dns-ingress"]
+        targets              = ["t-${module.vpc-network.network_name}-cloud-dns-ingress"]
         use_service_accounts = false
         rules = [
           {
@@ -170,8 +172,8 @@ module "custom-firewall-rule" {
  *****************************************/
 module "default_routes" {
   source                                 = "git::git@github.com:terraform-google-modules/terraform-google-network.git//modules/routes?ref=master"
-  project_id                             = var.service_project_id
-  network_name                           = module.standalone-vpc-network.network_name
+  project_id                             = var.project_id
+  network_name                           = module.vpc-network.network_name
   delete_default_internet_gateway_routes = true
   routes = [
     {
@@ -188,7 +190,7 @@ module "default_routes" {
  *****************************************/
 resource "google_dns_managed_zone" "google-apis" {
   name        = "google-apis"
-  project     = var.service_project_id
+  project     = var.project_id
   dns_name    = "googleapis.com."
   description = "private zone for Google API's"
 
@@ -196,14 +198,14 @@ resource "google_dns_managed_zone" "google-apis" {
 
   private_visibility_config {
     networks {
-      network_url = module.standalone-vpc-network.network_self_link
+      network_url = module.vpc-network.network_self_link
     }
   }
 }
 
 resource "google_dns_record_set" "restricted-google-apis-A-record" {
   name    = "restricted.googleapis.com."
-  project = var.service_project_id
+  project = var.project_id
   type    = "A"
   ttl     = 300
 
@@ -214,7 +216,7 @@ resource "google_dns_record_set" "restricted-google-apis-A-record" {
 
 resource "google_dns_record_set" "google-api-CNAME" {
   name    = "*.googleapis.com."
-  project = var.service_project_id
+  project = var.project_id
   type    = "CNAME"
   ttl     = 300
 
@@ -225,7 +227,7 @@ resource "google_dns_record_set" "google-api-CNAME" {
 
 resource "google_dns_managed_zone" "gcr-io" {
   name        = "gcr-io"
-  project     = var.service_project_id
+  project     = var.project_id
   dns_name    = "gcr.io."
   description = "private zone for GCR.io"
 
@@ -233,14 +235,14 @@ resource "google_dns_managed_zone" "gcr-io" {
 
   private_visibility_config {
     networks {
-      network_url = module.standalone-vpc-network.network_self_link
+      network_url = module.vpc-network.network_self_link
     }
   }
 }
 
 resource "google_dns_record_set" "restricted-gcr-io-A-record" {
   name    = "gcr.io."
-  project = var.service_project_id
+  project = var.project_id
   type    = "A"
   ttl     = 300
 
@@ -251,7 +253,7 @@ resource "google_dns_record_set" "restricted-gcr-io-A-record" {
 
 resource "google_dns_record_set" "gcr-io-CNAME" {
   name    = "*.gcr.io."
-  project = var.service_project_id
+  project = var.project_id
   type    = "CNAME"
   ttl     = 300
 

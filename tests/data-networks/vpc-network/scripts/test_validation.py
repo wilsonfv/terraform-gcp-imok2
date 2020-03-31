@@ -6,7 +6,7 @@ from subprocess import Popen, PIPE
 
 VALIDATION_PYFILE_PATH = \
     os.path.dirname(__file__) \
-    + '/../../../../data-networks/standalone-vpc-network/scripts/'
+    + '/../../../../data-networks/vpc-network/scripts/'
 
 
 def generate_tf_params(network_continent, subnets, secondary_ranges):

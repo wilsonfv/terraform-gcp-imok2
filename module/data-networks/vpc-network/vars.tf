@@ -1,10 +1,10 @@
-variable "service_project_id" {
+variable "project_id" {
   description = "The ID of the project where this VPC will be created"
 }
 
 variable "network_continent" {
   type = string
-  description = "the continent in which standalone vpc network will be created, it must be one of these values (EU, ASIA, US)"
+  description = "the continent in which vpc network will be created, it must be one of these values (EU, ASIA, US)"
 }
 
 variable "network_name" {
@@ -125,4 +125,10 @@ variable "custom_firewall_rules" {
     }))
     extra_attributes = map(string)
   }))
+}
+
+variable "shared_vpc_host" {
+  type        = bool
+  description = "Makes this project a Shared VPC host if 'true' (default 'false')"
+  default     = false
 }

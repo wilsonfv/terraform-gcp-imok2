@@ -34,10 +34,13 @@ def is_subnets_length_greater_than_zero(subnets):
     return len(subnets) > 0
 
 
-def is_cidr_within_allowed_ranges(cidr):
-    return ip_network(unicode(ALLOWED_MIN_CIDR_RANGE)) \
-           <= ip_network(unicode(cidr)) \
-           < ip_network(unicode(ALLOWED_MAX_CIDR_RANGE))
+def is_cidr_within_allowed_ranges(cidr, shared_vpc_host):
+    if shared_vpc_host:
+        return True
+    else:
+        return ip_network(unicode(ALLOWED_MIN_CIDR_RANGE)) \
+               <= ip_network(unicode(cidr)) \
+               < ip_network(unicode(ALLOWED_MAX_CIDR_RANGE))
 
 
 def is_network_continent_allowed(network_continent):
@@ -58,6 +61,7 @@ if __name__ == '__main__':
     network_continent = json.loads(TF_MODULE_PARAMS["network_continent"])
     subnets = json.loads(TF_MODULE_PARAMS["subnets"])
     secondary_ranges = json.loads(TF_MODULE_PARAMS["secondary_ranges"])
+    shared_vpc_host = json.loads(TF_MODULE_PARAMS["shared_vpc_host"])
 
     # with open('network_continent.tfdebug.txt', 'w') as outfile:
     #     json.dump(network_continent, outfile)
@@ -65,6 +69,8 @@ if __name__ == '__main__':
     #     json.dump(subnets, outfile)
     # with open('secondary_ranges.tfdebug.txt', 'w') as outfile:
     #     json.dump(secondary_ranges, outfile)
+    # with open('shared_vpc_host.tfdebug.txt', 'w') as outfile:
+    #     json.dump(shared_vpc_host, outfile)
 
     if not is_subnets_length_greater_than_zero(subnets):
         raise ValueError('Must provide at least one subnet')
@@ -83,7 +89,7 @@ if __name__ == '__main__':
 
     all_cidr_ranges = get_all_cidr_ranges(subnets, secondary_ranges)
     for cidr in all_cidr_ranges:
-        if not is_cidr_within_allowed_ranges(cidr):
+        if not is_cidr_within_allowed_ranges(cidr, shared_vpc_host):
             raise ValueError('CIDR {} is not within allowed devops ranges, '
                              'lowest allowed range: {}, '
                              'highest allowed range: {}'
